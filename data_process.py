@@ -6,17 +6,38 @@ import osmnx as ox
 
 
 def get_inputs(args):
+	'''
+	Load accident csvs into dataframes and process them: remove entries with no zip codes, and remove entries with <=100 accidents in that zip code
+	'''
 
-	df = pd.read_csv(args.csv_name).reset_index(drop=True)  #Import csv with accident database into pandas df
 	df_zip = pd.read_csv('Accidents_by_zip.csv', index_col=0)   #Import csv wtih total accidents per zip code
+	df_zip['Zip_simple'] = df_zip['Zip_simple'].astype(str)  #convert Zip_simple columns to string to avoid comparison errors later on
+	zips_100plus = df_zip[df_zip['tot_accidents'] > 100]['Zip_simple'].values #generate list of Zip_simples that have >100 accidents
 
+	df = pd.read_csv(args.csv_name)  #Import csv with accident database into pandas df (~3.5M rows)
+	df['Zip_simple'] = df['Zipcode'].str[0:5] #add Zip_simple column with just 5 letter zip codes 
+	df.dropna(subset=['Zip_simple'], inplace=True)  #drop rows from column that are missing zip codes (~1000)
+	df = df[df['Zip_simple'].isin(zips_100plus)]  #filter out zip codes with <100 accidents
+
+	# looking at only San Francisco accidents
+	df = df[df['City'] == 'San Francisco']
+
+	# if no A_ID specified, generate images for each accident in the df, otherwise generate for A_ID specified
+	if args.A_ID == None:
+		print('test1')
+		A_IDs = df['ID'].values
+		print('No A_IDs specified, will generate image for each accident in SF')
+	else:
+		A_IDs = [args.A_ID]
+		print('A_ID specified:', A_IDs)
+	
 	#distance from center of graph to end
 	distance = float(args.distance)
 
 	#grid_size N x N for danger zones
 	grid_size = args.grid_size
 
-	return df, df_zip, distance, grid_size
+	return df, df_zip, A_IDs, distance, grid_size
 
 
 def get_bbox(ax):
@@ -188,35 +209,34 @@ def generate_single_accident(df, df_zip, A_ID, distance, grid_size):
 
 def main(args):
 
-	df, df_zip, distance, grid_size = get_inputs(args)
+	# get inputs from provided arguments
+	df, df_zip, A_IDs, distance, grid_size = get_inputs(args)
 	print('Inputs Loaded Successfully')
- 
-	# looking at only San Francisco accidents
-	df = df[df['City'] == 'San Francisco']
 	
 	# initialize grids array which will capture the output danger matrix
 	grid_dict = {}
+	# initialize array to capture A_IDs that fail processing
+	failures_IDs = []
 	
-	num_rows = len(df)
+	# initialize counters for progress tracking
+	num_rows = len(A_IDs)
 	print('Num row to iterate:', num_rows)
 	row_counter = 0
 	threshold = 0
 	failure_counter = 0
-	failures_IDs = []
+	
 
-	#iterate through every accident
-	for index, row in df.iterrows():
- 
-		A_ID = row['ID']
+	#iterate through accidents
+	for A_ID in A_IDs: 
 		
 		try:
 			grid = generate_single_accident(df, df_zip, A_ID, distance, grid_size)
 			grid_dict[A_ID] = grid	
 		except:
-			# osmnx sometimes can't generate the image from different reasons, count the number of times this happens and store the incident A-ID
-			failures += 1
+			# osmnx sometimes can't generate the image for different reasons, so count the number of times this happens and store the incident A-ID
+			failure_counter += 1
 			failures_IDs.append(A_ID)
-	
+		
 		# track progress
 		row_counter += 1
 		percent_done = row_counter/num_rows*100
@@ -224,15 +244,16 @@ def main(args):
 			print('Row:', row_counter, ', Perc done:', "%.0f" % percent_done, ', Num failures:', failure_counter, ', Perc failed', "%.2f" % (failure_counter/row_counter*100))
 			threshold += 1
 			
-
+	#export danger matrix to grids.csv		
 	pd.DataFrame(grid_dict).to_csv('grids.csv')
+	#export list of failed A_IDs for manual examination
 	pd.DataFrame(failures_IDs).to_csv('failed_IDs.csv')
 
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-c', '--csv_name', default='US_Accidents_zip_100plus.csv')
-	parser.add_argument('-a', '--A_ID', default='A-809')
+	parser.add_argument('-c', '--csv_name', default='US_Accidents_June20.csv')
+	parser.add_argument('-a', '--A_ID', default=None)
 	parser.add_argument('-d', '--distance', default=250)
 	parser.add_argument('-g', '--grid_size', default=6)
 	args = parser.parse_args()
