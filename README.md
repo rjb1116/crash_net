@@ -4,7 +4,7 @@ Predict traffic accidents from an image of the road network
 ## Quick Summary
 This is the initial commit, mainly focused on data processing, of a crashNET neural network I'm building to predict traffic accident hotspots from images of road networks.
 
-The python file here, when run, will generate the input image and output matrix I'm planning to use to train my CNN.
+The python file data_process.py that's in the repo will generate the input image and output matrix I'm planning to use to train my CNN.
 
 A long writeup of this proposed project can be found here: (https://www.reubenbritto.com/tdi-proposal)
 
@@ -24,7 +24,7 @@ conda create -n ox --strict-channel-priority osmnx
 
 To run the data_process.py script, you'll need two things: 
 * Accidents_by_zip.csv: this file is provided when you clone the repo. It's a tally of the number of accidents by zip code
-* US_Accidents_June20.csv: this file you can download from [here]([docs](https://osmnx.readthedocs.io/) (this is database from smoosavi referenced above)
+* US_Accidents_June20.csv: this file you can download from [here](https://osmnx.readthedocs.io/) (this is database from smoosavi referenced above)
 
 If you run the following:
  
@@ -40,7 +40,7 @@ You can limit it to one accident using command line instructions:
 * -d: int representing the size of the geographic window around the accident. default is 250m which gives a 500m x 500m window since distance is from center to edge
 * -g: int representing grid size for the danger matrix. 
 
-Example Command Line Input (would recommend trying first:
+Example Command Line Input (would recommend trying first):
 
 ```
 python data_process.py -a 'A-809'
