@@ -250,6 +250,7 @@ def main(args):
 	pd.DataFrame(failures_IDs).to_csv('failed_IDs.csv')
 
 
+
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--csv_name', default='US_Accidents_June20.csv')
