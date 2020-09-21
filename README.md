@@ -24,7 +24,7 @@ conda create -n ox --strict-channel-priority osmnx
 
 To run the data_process.py script, you'll need two things: 
 * Accidents_by_zip.csv: this file is provided when you clone the repo. It's a tally of the number of accidents by zip code
-* US_Accidents_June20.csv: this file you can download from [here](https://osmnx.readthedocs.io/) (this is database from smoosavi referenced above)
+* US_Accidents_June20.csv: this file you can download from [here](https://osmnx.readthedocs.io/) (this is the database from smoosavi referenced above)
 
 If you run the following:
  
