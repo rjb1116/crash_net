@@ -3,41 +3,76 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import osmnx as ox
+import json
+import os
+import shutil
+import cv2
+
+def load_model_config(config_path):
+    """
+    Load the model json file from disc
+    """
+    full_path = os.path.expanduser(config_path)
+    with open(full_path, 'r') as f:
+        config = json.load(f)
+    
+    return config['data_process']
+
+def make_data_folder(config, config_path):
+	'''
+	Make dataset folder and images folder
+	'''
+
+	# Specifying path to save dataset
+	dataset_path = os.path.expanduser(f"datasets/{config['dataset_name']}/")
+	image_path = os.path.expanduser(dataset_path + 'images/')
+	if os.path.exists(dataset_path):
+		shutil.rmtree(dataset_path)
+
+	os.makedirs(image_path)
+
+	# Save a copy of config to dataset folder for reference
+	shutil.copy( config_path, os.path.join(dataset_path, 'data_process_config.json'))
+
+	return dataset_path, image_path
 
 
-def get_inputs(args):
+def get_inputs(config):
 	'''
 	Load accident csvs into dataframes and process them: remove entries with no zip codes, and remove entries with <=100 accidents in that zip code
 	'''
 
-	df_zip = pd.read_csv('Accidents_by_zip.csv', index_col=0)   #Import csv wtih total accidents per zip code
+	df_zip = pd.read_csv(config['zip_csv_path'], index_col=0)   #Import csv wtih total accidents per zip code
 	df_zip['Zip_simple'] = df_zip['Zip_simple'].astype(str)  #convert Zip_simple columns to string to avoid comparison errors later on
 	zips_100plus = df_zip[df_zip['tot_accidents'] > 100]['Zip_simple'].values #generate list of Zip_simples that have >100 accidents
 
-	df = pd.read_csv(args.csv_name)  #Import csv with accident database into pandas df (~3.5M rows)
+	df = pd.read_csv(config['accidents_csv_path'])  #Import csv with accident database into pandas df (~3.5M rows)
 	df['Zip_simple'] = df['Zipcode'].str[0:5] #add Zip_simple column with just 5 letter zip codes 
 	df.dropna(subset=['Zip_simple'], inplace=True)  #drop rows from column that are missing zip codes (~1000)
 	df = df[df['Zip_simple'].isin(zips_100plus)]  #filter out zip codes with <100 accidents
 
-	# looking at only San Francisco accidents
-	df = df[df['City'] == 'San Francisco']
+	# limiting database to a specific location
+	df = df[df[config['limit_category']] == config['limit_value']]
 
 	# if no A_ID specified, generate images for each accident in the df, otherwise generate for A_ID specified
-	if args.A_ID == None:
-		print('test1')
-		A_IDs = df['ID'].values
-		print('No A_IDs specified, will generate image for each accident in SF')
+	if config['A_ID'] == 'None':
+		#randomly sample A_IDs from df to create training examples
+		A_IDs = df['ID'].sample(n = config['sample_size'], replace = False).values
+		print('No A_IDs specified, will generate images for', config['sample_size'], 'accidents in', config['limit_value'])  #ADD SAMPLE SIZE AND LIMIT VALUE
 	else:
-		A_IDs = [args.A_ID]
-		print('A_ID specified:', A_IDs)
+		A_IDs = [config['A_ID']]
+		print('A_ID specified, will generate images for', A_IDs, 'in', config['limit_value'])
 	
 	#distance from center of graph to end
-	distance = float(args.distance)
+	distance = float(config['distance'])
 
 	#grid_size N x N for danger zones
-	grid_size = args.grid_size
+	grid_size = config['grid_size']
 
-	return df, df_zip, A_IDs, distance, grid_size
+	#number of pixels on one size of image
+	pixels = config['image_pixels']
+
+	return df, df_zip, A_IDs, distance, grid_size, pixels
 
 
 def get_bbox(ax):
@@ -50,7 +85,7 @@ def get_bbox(ax):
 
 	return bbox
 
-def	make_graph(lat, lng, distance):
+def	make_graph(lat, lng, distance, pixels):
 	'''
 	Make initial graph of accident area from lat, lng, return graph, plot, and bounding box of area plotted
 	'''
@@ -59,7 +94,6 @@ def	make_graph(lat, lng, distance):
 
 	#create fig
 	my_dpi = 192
-	pixels = 400
 	fig = plt.figure(figsize=(pixels/my_dpi, pixels/my_dpi), dpi=my_dpi, constrained_layout=True)
 	ax = fig.add_subplot()
 	
@@ -164,13 +198,14 @@ def add_grid(fig, ax, grid_size, bbox, df_bbox, num_zip_accidents):
 			alpha = 0.5
 		#generate plot overlay and add to ax
 		ax.fill(xs, ys, "r", alpha = alpha)
+		ax.text(xs[0], np.mean(ys), "%.8f" % danger_coeff, color='blue', fontsize=3)
 
 
 	return grid, ax	
 
 
 
-def generate_single_accident(df, df_zip, A_ID, distance, grid_size):
+def generate_single_accident(df, df_zip, A_ID, distance, grid_size, pixels, image_path):
 	'''
 	This script takes an accident ID from the Accidents csv and generates an input figure and a labelled figure
 	'''
@@ -188,10 +223,10 @@ def generate_single_accident(df, df_zip, A_ID, distance, grid_size):
 	num_zip_accidents = df_zip[df_zip['Zip_simple'] == zip_code]['tot_accidents'].values[0]
 
 	# make initial graph accident window and plot
-	fig, ax, G, bbox = make_graph(lat, lng, distance)
+	fig, ax, G, bbox = make_graph(lat, lng, distance, pixels)
 
 	# save this as input figure
-	fig.savefig('figs/' + A_ID + '_input.png')
+	fig.savefig(image_path + A_ID + '_input.png')
 
 	#get df of accidents in accident window and add to figure
 	fig, ax, df_bbox = add_accidents(fig, ax, bbox, df)
@@ -200,7 +235,7 @@ def generate_single_accident(df, df_zip, A_ID, distance, grid_size):
 	grid, ax = add_grid(fig, ax, grid_size, bbox, df_bbox, num_zip_accidents)
 
 	# save as labelled figure
-	fig.savefig('figs/' + A_ID + '_output.png')
+	fig.savefig(image_path + A_ID + '_output.png')
 
 	plt.close() #clear figures
 
@@ -209,11 +244,18 @@ def generate_single_accident(df, df_zip, A_ID, distance, grid_size):
 
 def main(args):
 
+	#load 'data_process' parameters from model_config.json into dictionary
+	config = load_model_config(args.config_path)
+
+	#make folder for dataset, put copy of model_config.json there, and return data_path for saving images
+	dataset_path, image_path = make_data_folder(config, args.config_path)
+	print('Config loaded, dataset folder created:', dataset_path) 	
+
 	# get inputs from provided arguments
-	df, df_zip, A_IDs, distance, grid_size = get_inputs(args)
+	df, df_zip, A_IDs, distance, grid_size, pixels = get_inputs(config)
 	print('Inputs Loaded Successfully')
 	
-	# initialize grids array which will capture the output danger matrix
+	# initialize grid dict to more easily 
 	grid_dict = {}
 	# initialize array to capture A_IDs that fail processing
 	failures_IDs = []
@@ -230,10 +272,10 @@ def main(args):
 	for A_ID in A_IDs: 
 		
 		try:
-			grid = generate_single_accident(df, df_zip, A_ID, distance, grid_size)
+			grid = generate_single_accident(df, df_zip, A_ID, distance, grid_size, pixels, image_path)
 			grid_dict[A_ID] = grid	
 		except:
-			# osmnx sometimes can't generate the image for different reasons, so count the number of times this happens and store the incident A-ID
+			# osmnx sometimes can't generate the road network of an accident for various reasons, so count the number of times this happens and store the incident A-ID
 			failure_counter += 1
 			failures_IDs.append(A_ID)
 		
@@ -243,19 +285,21 @@ def main(args):
 		if percent_done > threshold:
 			print('Row:', row_counter, ', Perc done:', "%.0f" % percent_done, ', Num failures:', failure_counter, ', Perc failed', "%.2f" % (failure_counter/row_counter*100))
 			threshold += 1
-			
+
 	#export danger matrix to grids.csv		
-	pd.DataFrame(grid_dict).to_csv('grids.csv')
+	pd.DataFrame(grid_dict).to_csv(dataset_path + 'grids.csv')
+
 	#export list of failed A_IDs for manual examination
-	pd.DataFrame(failures_IDs).to_csv('failed_IDs.csv')
-
-
+	pd.DataFrame(failures_IDs).to_csv(dataset_path + 'failed_IDs.csv')
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser()
-	parser.add_argument('-c', '--csv_name', default='US_Accidents_June20.csv')
-	parser.add_argument('-a', '--A_ID', default=None)
-	parser.add_argument('-d', '--distance', default=250)
-	parser.add_argument('-g', '--grid_size', default=6)
-	args = parser.parse_args()
-	main(args)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-cf',
+        '--config_path',
+        default='model_config.json',
+        help="Path to model config file"
+    )
+    args = parser.parse_args()
+    main(args)
+

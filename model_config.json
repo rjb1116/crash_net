@@ -1,0 +1,55 @@
+{
+   "data_process":{
+      "limit_category": "City",
+      "limit_value": "San Francisco",
+      "sample_size": 1000,
+      "A_ID": "None",
+      "distance": 250,
+      "grid_size": 6,
+      "image_pixels": 384,
+
+      "zip_csv_path": "Accidents_by_zip.csv",
+      "accidents_csv_path": "US_Accidents_June20.csv",
+      "dataset_name": "SF_1000"
+   },
+
+
+   "model":{
+      "model_name": "01_CPFF",
+      "learning_rate": 0.01,
+      "epochs": 50,
+      "batch_size": 128,
+      "layers":{
+         "one":{
+            "type": "Conv2D_first",
+            "filters": 32,
+            "kernel_size": 3,
+            "strides": 1,
+            "padding": "same",
+            "activation": "relu"
+         },
+         
+         "two":{
+            "type": "MaxPooling2D",
+            "pool_size":2,
+            "strides":2
+         },
+         
+         "three":{
+            "type": "Flatten"
+         },
+         
+         "four":{
+            "type": "FullyConnected",
+            "units": 128,
+            "activation": "relu"
+         },
+         
+         "five":{
+            "type": "FullyConnected",
+            "units": 36,
+            "activation": "sigmoid"
+         }
+      }
+   }
+}
