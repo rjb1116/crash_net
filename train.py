@@ -151,7 +151,7 @@ def fit_model(X_train, Y_train, X_test, Y_test, config, image_pixel_size, grid_l
 	model = build_model(config['layers'], image_pixel_size, grid_length)
 
 	#add loss and optimizer to model
-	model.compile(loss="binary_crossentropy", optimizer=keras.optimizers.Adam(lr=config['learning_rate']))
+	model.compile(loss="binary_crossentropy", optimizer=keras.optimizers.Adam(lr=config['learning_rate'])) #binary_crossentropy
 
 	#add model callbacks
 	callbacks = [
@@ -237,7 +237,7 @@ def add_grid(A_IDs, Y_pred, grid_size, image_pixels, dataset_path, model_path, f
 			box_counter += 1
 
 		A_ID_counter += 1
-			
+
 		fig.savefig(f'{model_path}{folder}_predict/{A_ID}_predict.png')
 		plt.close() #clear figures
 

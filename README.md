@@ -2,9 +2,9 @@
 Predict traffic accidents from an image of the road network
 
 ## Quick Summary
-This is the initial commit, mainly focused on data processing, of a crashNET neural network I'm building to predict traffic accident hotspots from images of road networks.
+This is the initial commit of my convolutional neural network built using keras. 
 
-The python file data_process.py that's in the repo will generate the input image and output matrix I'm planning to use to train my CNN.
+The python file data_process.py will generate the input image and output matrix that train.py will use to train.
 
 A long writeup of this proposed project can be found here: (https://www.reubenbritto.com/tdi-proposal)
 
@@ -15,36 +15,46 @@ The data I'm processing comes from two sources: a database (https://smoosavi.org
 
 ## How to run the code
 
-First, I recommend creating a virtual environment using condas specifically for this data processing since osmnx requires a lot of dependencies. Once you've installed condas, run the code below to create an (ox) virtual environment.
+First, I recommend creating two seprate virtual environments using condas (the creator of osmnx recommends condas specifically). One virtual environment to run data_process.py, and another virutal environment to run train.py  
+
+### Running data_process.py to generate training examples.
+
+Once you've installed condas, run the code below to create an (ox) virtual environment.
 
 ```
 conda config --prepend channels conda-forge
 conda create -n ox --strict-channel-priority osmnx
 ```
 
-To run the data_process.py script, you'll need two things: 
+To run the data_process.py script, you'll need three things: 
 * Accidents_by_zip.csv: this file is provided when you clone the repo. It's a tally of the number of accidents by zip code
 * US_Accidents_June20.csv: this file you can download from [here](https://osmnx.readthedocs.io/) (this is the database from smoosavi referenced above)
+* model_config.json: this file specifies which geographical locations to randomly pull training examples, and how many training examples to pull from US_Accidents_June20.csv to generate your training set.
 
-If you run the following:
+Once you have the above three things, if you run the following:
  
 ```
 python data_process.py
 ```
 
-the code will start generating input and output images for all the accidents that have occurred in SF and put them in the figs/ folder. This will take hours.
+the code will start generating input and output images for all the accidents that have occurred in SF and put them in datasets/[dataset_name]/ that you specify in the "date_process" part of the model_config.json file. This will take hours. You can and should use config file to limit where and how many accidents are generated.
 
-You can limit it to one accident using command line instructions:
-* -a: String of accident ID, 'A-ID'. Eg 'A-809'
-* -c: String of csv containing accident database. If you want to manually modify the 'US_Accidents_June20.csv' and rename it, this is where you would put the new title. But be careful, the code was written assuming the 'US_Accidents_June20.csv' is being loaded in.   
-* -d: int representing the size of the geographic window around the accident. default is 250m which gives a 500m x 500m window since distance is from center to edge
-* -g: int representing grid size for the danger matrix. 
+### Running train.py to train a CNN.
 
-Example Command Line Input (would recommend trying first):
+Run the code below to create an (ml) virtual environment for running keras.
 
 ```
-python data_process.py -a 'A-809'
-``` 
+conda create -n ml
+conda install -r requirements.txt
+```
+
+You can now run 
+
+```
+python train.py
+```
+
+but you should customize the "model" part of the model_config.json first. In this config file, you can actually specify the architecture of your CNN, and all the hyperparameters. Once run, the model outputs will be placed into a new folder within the datasets/[dataset_name] folder.
 
 
 
